@@ -25,7 +25,7 @@ public abstract class BalanceServiceContractTest {
     protected abstract Backend createBackend();
 
     /** Rounds of the two-debit race (Scecnario 3). A slower backend may lower it. */
-    protected int raceRounds() {
+    private int raceRounds() {
         return 1_000;
     }
 

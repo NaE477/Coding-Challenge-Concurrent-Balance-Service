@@ -36,11 +36,6 @@ class UnsafeBalanceService implements BalanceService, AccountRegistry {
     }
 
     @Override
-    public boolean exists(String accountId) {
-        return balances.containsKey(accountId);
-    }
-
-    @Override
     public void credit(String accountId, long amount, String transactionId) {
         OperationValidator.validateCredit(accountId, amount, transactionId);
         if (alreadySeen(transactionId)) {

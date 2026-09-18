@@ -12,10 +12,9 @@ spring:
     activate:
       on-profile: postgres
   autoconfigure:
-    exclude:
-      - []
+    exclude: []
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/balance}
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/balance}
     username: ${DB_USERNAME:balance}
     password: ${DB_PASSWORD:balance}
   flyway:

@@ -3,22 +3,20 @@ package com.code.challenge.mofid.service.implementations.inmemory;
 import com.code.challenge.mofid.exception.IdempotencyConflictException;
 import com.code.challenge.mofid.model.TransactionRequest;
 
+import com.code.challenge.mofid.service.TransactionLedger;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/**
- * Runs each transactionId's operation at most once. A duplicate waits for the first attempt and gets its result;
- * the same id with a different request is a conflict. A failed attempt frees the id for a retry.
- */
-class TransactionLedger {
+class InMemoryTransactionLedger implements TransactionLedger {
 
     private record TransactionEntry(TransactionRequest request, CompletableFuture<RuntimeException> outcome) {
     }
 
     private final ConcurrentMap<String, TransactionEntry> entries = new ConcurrentHashMap<>();
 
-    void executeOperation(String transactionId, TransactionRequest request, Runnable operation) {
+    @Override
+    public void executeOperation(String transactionId, TransactionRequest request, Runnable operation) {
         TransactionEntry newTransactionEntry = new TransactionEntry(request, new CompletableFuture<>());
         TransactionEntry earlierTransactionEntry = entries.putIfAbsent(transactionId, newTransactionEntry);
         if (earlierTransactionEntry == null) { // Fresh transaction

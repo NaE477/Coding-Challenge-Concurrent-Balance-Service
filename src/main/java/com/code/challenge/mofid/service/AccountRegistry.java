@@ -10,6 +10,4 @@ public interface AccountRegistry {
      * @throws DuplicateAccountException if the account already exists
      */
     void openAccount(String accountId, long initialBalance);
-
-    boolean exists(String accountId);
 }

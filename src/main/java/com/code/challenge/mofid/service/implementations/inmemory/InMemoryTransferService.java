@@ -1,6 +1,7 @@
 package com.code.challenge.mofid.service.implementations.inmemory;
 
 import com.code.challenge.mofid.model.TransactionRequest;
+import com.code.challenge.mofid.service.TransactionLedger;
 import com.code.challenge.mofid.service.TransferService;
 import com.code.challenge.mofid.service.implementations.inmemory.model.InMemoryLockedAccount;
 import com.code.challenge.mofid.validation.OperationValidator;

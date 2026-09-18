@@ -9,7 +9,7 @@ import com.code.challenge.mofid.service.implementations.BalanceServiceImpl;
 final class InMemoryFixture {
 
     final InMemoryAccountStore accounts = new InMemoryAccountStore();
-    final TransactionLedger ledger = new TransactionLedger();
+    final InMemoryTransactionLedger ledger = new InMemoryTransactionLedger();
     final CreditService creditService = new InMemoryCreditService(accounts, ledger);
     final DebitService debitService = new InMemoryDebitService(accounts, ledger);
     final TransferService transferService = new InMemoryTransferService(accounts, ledger);

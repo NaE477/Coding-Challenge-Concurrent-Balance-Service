@@ -21,12 +21,6 @@ public class InMemoryAccountStore implements AccountRegistry {
         }
     }
 
-    @Override
-    public boolean exists(String accountId) {
-        OperationValidator.validateAccountId(accountId);
-        return accounts.containsKey(accountId);
-    }
-
     InMemoryLockedAccount get(String accountId) {
         InMemoryLockedAccount account = accounts.get(accountId);
         if (account == null) {

@@ -20,13 +20,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class TransactionLedgerTest {
+class InMemoryTransactionLedgerTest {
 
     private static final TransactionRequest CREDIT_A = new TransactionRequest(TransactionType.CREDIT, null, "A", 100);
     private static final TransactionRequest DEBIT_A = new TransactionRequest(TransactionType.DEBIT, "A", null, 100);
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private final TransactionLedger ledger = new TransactionLedger();
+    private final InMemoryTransactionLedger ledger = new InMemoryTransactionLedger();
     private final AtomicInteger executions = new AtomicInteger();
 
     @Test
