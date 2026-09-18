@@ -2,7 +2,9 @@ package com.code.challenge.mofid.service.implementations;
 
 import com.code.challenge.mofid.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
+@Service
 @RequiredArgsConstructor
 public class BalanceServiceImpl implements BalanceService {
 
