@@ -1,9 +1,9 @@
 package com.code.challenge.mofid.controller;
 
-import com.code.challenge.mofid.controller.dtos.AmountBody;
-import com.code.challenge.mofid.controller.dtos.BalanceResponse;
-import com.code.challenge.mofid.controller.dtos.OpenAccountBody;
-import com.code.challenge.mofid.controller.dtos.TransferBody;
+import com.code.challenge.mofid.controller.dtos.balance.AmountBody;
+import com.code.challenge.mofid.controller.dtos.balance.BalanceResponse;
+import com.code.challenge.mofid.controller.dtos.balance.OpenAccountBody;
+import com.code.challenge.mofid.controller.dtos.balance.TransferBody;
 import com.code.challenge.mofid.service.AccountRegistry;
 import com.code.challenge.mofid.service.BalanceService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +25,12 @@ public class BalanceController {
         accountRegistry.openAccount(body.accountId(), body.initialBalance());
         return ResponseEntity.created(URI.create("/accounts/" + body.accountId() + "/balance"))
                 .body(new BalanceResponse(body.accountId(), body.initialBalance()));
+    }
+
+    @DeleteMapping("/accounts/{accountId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount(@PathVariable String accountId) {
+        accountRegistry.deleteAccount(accountId);
     }
 
     @GetMapping("/accounts/{accountId}/balance")

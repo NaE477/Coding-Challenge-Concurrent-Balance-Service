@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Transactions report</title>
+    <style>
+        :root { --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #667085; --line: #e4e7ec;
+                --ok: #067647; --ok-bg: #ecfdf3; --err: #b42318; --err-bg: #fef3f2; --new: #fff6d6; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #0f1218; --card: #171b24; --text: #e6e9ef; --muted: #98a2b3; --line: #2a3140;
+                    --ok: #47cd89; --ok-bg: #0f2a1d; --err: #f97066; --err-bg: #2d1414; --new: #3a3212; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+               font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { max-width: 1000px; margin: 0 auto; }
+        header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
+        h1 { font-size: 22px; margin: 0; flex: 1; }
+        nav a { color: var(--muted); }
+        .status { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); }
+        .status.error { background: var(--err-bg); color: var(--err); }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+                margin-bottom: 20px; max-width: 240px; }
+        .card .label { color: var(--muted); font-size: 13px; }
+        .card .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        th { color: var(--muted); font-weight: 500; font-size: 13px; }
+        tr:last-child td { border-bottom: none; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .muted { color: var(--muted); }
+        .empty { color: var(--muted); text-align: center; }
+        @keyframes arrived { from { background: var(--new); } to { background: transparent; } }
+        tr.new td { animation: arrived 2s ease-out; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Transactions</h1>
+        <nav><a href="accounts.html">← Accounts</a></nav>
+        <span id="status" class="status">Connecting…</span>
+    </header>
+    <div class="card"><div class="label">Applied transactions</div><div class="value" id="count">–</div></div>
+    <div class="scroll">
+        <table>
+            <thead><tr><th>Time</th><th>Transaction</th><th>Type</th><th>From</th><th>To</th><th class="num">Amount</th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</main>
+<script>
+    // Polls the report and redraws it, newest first; rows that arrived since the last poll are highlighted.
+    const REFRESH_MS = 2000;
+    const number = new Intl.NumberFormat();
+    const status = document.getElementById('status');
+    let seen = null; // transaction ids already shown; null until the first load
+
+    function cell(text, className) {
+        const td = document.createElement('td');
+        td.textContent = text ?? '—'; // ids are user input: never innerHTML
+        if (className) td.className = className;
+        return td;
+    }
+
+    async function refresh() {
+        try {
+            const response = await fetch('/reports/transactions', { cache: 'no-store' });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const report = await response.json();
+
+            document.getElementById('count').textContent = number.format(report.count);
+            const rows = report.transactions.slice().reverse().map(tx => {
+                const tr = document.createElement('tr');
+                tr.append(
+                    cell(new Date(tx.recordedAt).toLocaleString(), 'muted'),
+                    cell(tx.transactionId),
+                    cell(tx.type),
+                    cell(tx.sourceAccountId),
+                    cell(tx.destinationAccountId),
+                    cell(number.format(tx.amount), 'num'));
+                if (seen && !seen.has(tx.transactionId)) tr.className = 'new';
+                return tr;
+            });
+            seen = new Set(report.transactions.map(tx => tx.transactionId));
+            if (rows.length === 0) {
+                const tr = document.createElement('tr');
+                const td = cell('No transactions yet', 'empty');
+                td.colSpan = 6;
+                tr.append(td);
+                rows.push(tr);
+            }
+            document.getElementById('rows').replaceChildren(...rows);
+
+            status.textContent = 'Live · updated ' + new Date().toLocaleTimeString();
+            status.classList.remove('error');
+        } catch (error) {
+            status.textContent = 'Disconnected, retrying…';
+            status.classList.add('error');
+        }
+    }
+
+    (async function poll() {
+        await refresh();
+        setTimeout(poll, REFRESH_MS);
+    })();
+</script>
+</body>
+</html>

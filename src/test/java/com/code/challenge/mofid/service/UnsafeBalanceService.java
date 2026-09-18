@@ -36,6 +36,13 @@ class UnsafeBalanceService implements BalanceService, AccountRegistry {
     }
 
     @Override
+    public void deleteAccount(String accountId) {
+        if (balances.remove(accountId) == null) {
+            throw new AccountNotFoundException(accountId);
+        }
+    }
+
+    @Override
     public void credit(String accountId, long amount, String transactionId) {
         OperationValidator.validateCredit(accountId, amount, transactionId);
         if (alreadySeen(transactionId)) {

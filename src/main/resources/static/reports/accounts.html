@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Accounts report</title>
+    <style>
+        :root { --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #667085; --line: #e4e7ec;
+                --ok: #067647; --ok-bg: #ecfdf3; --err: #b42318; --err-bg: #fef3f2; --accent: #2f5bd3; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #0f1218; --card: #171b24; --text: #e6e9ef; --muted: #98a2b3; --line: #2a3140;
+                    --ok: #47cd89; --ok-bg: #0f2a1d; --err: #f97066; --err-bg: #2d1414; --accent: #7b9cff; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+               font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { max-width: 760px; margin: 0 auto; }
+        header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
+        h1 { font-size: 22px; margin: 0; flex: 1; }
+        nav a { color: var(--muted); }
+        .status { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); }
+        .status.error { background: var(--err-bg); color: var(--err); }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+        .card .label { color: var(--muted); font-size: 13px; }
+        .card .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; background: var(--card);
+               border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+        label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); flex: 1; min-width: 140px; }
+        input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+        button { font: inherit; border-radius: 6px; padding: 6px 14px; cursor: pointer; border: 1px solid transparent; }
+        button.primary { background: var(--accent); color: #fff; }
+        button.danger { background: transparent; color: var(--err); border-color: var(--line); padding: 2px 10px; font-size: 13px; }
+        .message { min-height: 22px; font-size: 14px; margin: 0 0 16px; }
+        .message.ok { color: var(--ok); }
+        .message.error { color: var(--err); }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+        th { color: var(--muted); font-weight: 500; font-size: 13px; }
+        tr:last-child td { border-bottom: none; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .action { width: 1%; text-align: right; }
+        td { word-break: break-all; }
+        .empty { color: var(--muted); text-align: center; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Accounts</h1>
+        <nav><a href="transactions.html">Transactions →</a></nav>
+        <span id="status" class="status">Connecting…</span>
+    </header>
+    <section class="cards">
+        <div class="card"><div class="label">Accounts</div><div class="value" id="count">–</div></div>
+        <div class="card"><div class="label">Total balance</div><div class="value" id="total">–</div></div>
+    </section>
+    <form id="create">
+        <label>Account id<input id="accountId" required maxlength="64" autocomplete="off"></label>
+        <label>Initial balance<input id="initialBalance" type="number" min="0" step="1" value="0" required></label>
+        <button class="primary" type="submit">Create account</button>
+    </form>
+    <p id="message" class="message" role="status"></p>
+    <table>
+        <thead><tr><th>Account</th><th class="num">Balance</th><th class="action"></th></tr></thead>
+        <tbody id="rows"></tbody>
+    </table>
+</main>
+<script>
+    // Polls the report and redraws it: the page stays current without a manual refresh.
+    const REFRESH_MS = 2000;
+    const number = new Intl.NumberFormat();
+    const status = document.getElementById('status');
+    const message = document.getElementById('message');
+
+    function cell(text, className) {
+        const td = document.createElement('td');
+        td.textContent = text; // ids are user input: never innerHTML
+        if (className) td.className = className;
+        return td;
+    }
+
+    function show(text, ok) {
+        message.textContent = text;
+        message.className = 'message ' + (ok ? 'ok' : 'error');
+    }
+
+    // Error responses are RFC 9457 problems; their "detail" explains what went wrong.
+    async function problemDetail(response) {
+        try {
+            return (await response.json()).detail || 'HTTP ' + response.status;
+        } catch {
+            return 'HTTP ' + response.status;
+        }
+    }
+
+    function deleteButton(account) {
+        const button = document.createElement('button');
+        button.className = 'danger';
+        button.type = 'button';
+        button.textContent = 'Delete';
+        button.addEventListener('click', async () => {
+            const question = 'Delete account "' + account.accountId + '"? Its balance of '
+                + number.format(account.balance) + ' will be discarded, and the id can\'t be used again.';
+            if (!confirm(question)) return;
+            const response = await fetch('/accounts/' + encodeURIComponent(account.accountId), { method: 'DELETE' });
+            if (response.ok) show('Deleted ' + account.accountId + '.', true);
+            else show(await problemDetail(response), false);
+            refresh();
+        });
+        const td = document.createElement('td');
+        td.className = 'action';
+        td.append(button);
+        return td;
+    }
+
+    document.getElementById('create').addEventListener('submit', async event => {
+        event.preventDefault();
+        const accountId = document.getElementById('accountId').value;
+        const initialBalance = Number(document.getElementById('initialBalance').value);
+        const response = await fetch('/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accountId, initialBalance })
+        });
+        if (response.ok) {
+            show('Created ' + accountId + ' with ' + number.format(initialBalance) + '.', true);
+            event.target.reset();
+        } else {
+            show(await problemDetail(response), false);
+        }
+        refresh();
+    });
+
+    async function refresh() {
+        try {
+            const response = await fetch('/reports/accounts', { cache: 'no-store' });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const report = await response.json();
+
+            document.getElementById('count').textContent = number.format(report.accountCount);
+            document.getElementById('total').textContent = number.format(report.totalBalance);
+            const rows = report.accounts.map(account => {
+                const tr = document.createElement('tr');
+                tr.append(cell(account.accountId), cell(number.format(account.balance), 'num'), deleteButton(account));
+                return tr;
+            });
+            if (rows.length === 0) {
+                const tr = document.createElement('tr');
+                const td = cell('No accounts yet', 'empty');
+                td.colSpan = 3;
+                tr.append(td);
+                rows.push(tr);
+            }
+            document.getElementById('rows').replaceChildren(...rows);
+
+            status.textContent = 'Live · updated ' + new Date().toLocaleTimeString();
+            status.classList.remove('error');
+        } catch (error) {
+            status.textContent = 'Disconnected, retrying…';
+            status.classList.add('error');
+        }
+    }
+
+    (async function poll() {
+        await refresh();
+        setTimeout(poll, REFRESH_MS);
+    })();
+</script>
+</body>
+</html>

@@ -19,7 +19,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, exception);
     }
 
-    @ExceptionHandler({IdempotencyConflictException.class, DuplicateAccountException.class})
+    @ExceptionHandler({IdempotencyConflictException.class, DuplicateAccountException.class, DeletedAccountException.class})
     public ProblemDetail conflict(BalanceServiceException exception) {
         return problem(HttpStatus.CONFLICT, exception);
     }

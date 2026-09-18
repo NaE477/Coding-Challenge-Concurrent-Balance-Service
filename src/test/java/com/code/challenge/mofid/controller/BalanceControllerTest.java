@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -123,6 +124,21 @@ class BalanceControllerTest {
                 .andExpect(jsonPath("$.error").value("SameAccountTransferException"));
 
         expectBalance(a, 1_000);
+    }
+
+    @Test
+    void deletedAccountIsGoneForGoodAndItsIdCantBeReused() throws Exception {
+        open(a, 1_000);
+
+        mvc.perform(delete("/accounts/{id}", a)).andExpect(status().isNoContent());
+
+        mvc.perform(get("/accounts/{id}/balance", a)).andExpect(status().isNotFound());
+        open(a, 0)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("DeletedAccountException"));
+        mvc.perform(delete("/accounts/{id}", a)).andExpect(status().isNotFound());
+        mvc.perform(get("/reports/accounts"))
+                .andExpect(jsonPath("$.accounts[?(@.accountId == '%s')]".formatted(a)).isEmpty());
     }
 
     @Test

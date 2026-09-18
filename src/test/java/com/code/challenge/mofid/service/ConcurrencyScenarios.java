@@ -1,9 +1,12 @@
 package com.code.challenge.mofid.service;
 
+import com.code.challenge.mofid.exception.AccountNotFoundException;
 import com.code.challenge.mofid.exception.InsufficientFundsException;
 import com.code.challenge.mofid.support.Concurrently;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Concurrent workloads.
@@ -173,6 +176,55 @@ public final class ConcurrencyScenarios {
 
         checks.add(new Check("duplicate calls that failed", 0, failed));
         return checks;
+    }
+
+    /**
+     * Scenario 7: 200 transfers of 1 into an account while it is being deleted.
+     */
+    public List<Check> transfersRacingADeleteOfTheirDestination() {
+        accounts.openAccount("source", 100_000);
+        accounts.openAccount("target", 0);
+        AtomicBoolean deleteReturned = new AtomicBoolean();
+        AtomicInteger succeededAfterDelete = new AtomicInteger();
+        List<Runnable> tasks = new ArrayList<>();
+        for (int i = 0; i < 200; i++) {
+            String transactionId = "into-target-" + i;
+            tasks.add(() -> {
+                boolean startedAfterDelete = deleteReturned.get();
+                service.transfer("source", "target", 1, transactionId);
+                if (startedAfterDelete) {
+                    succeededAfterDelete.incrementAndGet();
+                }
+            });
+        }
+        int deleteTask = tasks.size() / 2;
+        tasks.add(deleteTask, () -> {
+            accounts.deleteAccount("target");
+            deleteReturned.set(true);
+        });
+
+        List<Throwable> failures = Concurrently.run(tasks);
+
+        List<Throwable> transferFailures = new ArrayList<>(failures);
+        Throwable deleteFailure = transferFailures.remove(deleteTask);
+        long succeeded = transferFailures.stream().filter(Objects::isNull).count();
+        long notFound = transferFailures.stream().filter(AccountNotFoundException.class::isInstance).count();
+        long targetGone;
+        try {
+            service.getBalance("target");
+            targetGone = 0;
+        } catch (AccountNotFoundException expected) {
+            targetGone = 1;
+        }
+        return List.of(
+                new Check("delete failed", 0, deleteFailure == null ? 0 : 1),
+                new Check("transfers that started after the delete returned and still succeeded", 0,
+                        succeededAfterDelete.get()),
+                new Check("transfers that failed for a reason other than the deleted account", 0,
+                        transferFailures.size() - succeeded - notFound),
+                new Check("source balance (100,000 minus one per successful transfer)", 100_000 - succeeded,
+                        service.getBalance("source")),
+                new Check("target reported as not found after the delete", 1, targetGone));
     }
 
     private static List<Runnable> copies(int count, Runnable task) {

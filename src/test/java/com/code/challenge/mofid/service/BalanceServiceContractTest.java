@@ -272,6 +272,55 @@ public abstract class BalanceServiceContractTest {
     }
 
     @Nested
+    class AccountDeletion {
+
+        @Test
+        void deletedAccountBehavesAsIfItNeverExistedEvenWithABalance() {
+            accounts.openAccount("A", 1_000);
+            accounts.openAccount("B", 500);
+
+            accounts.deleteAccount("A");
+
+            assertThatThrownBy(() -> service.getBalance("A")).isInstanceOf(AccountNotFoundException.class);
+            assertThatThrownBy(() -> service.credit("A", 100, "TX-1")).isInstanceOf(AccountNotFoundException.class);
+            assertThatThrownBy(() -> service.debit("A", 100, "TX-2")).isInstanceOf(AccountNotFoundException.class);
+            assertThatThrownBy(() -> service.transfer("A", "B", 100, "TX-3")).isInstanceOf(AccountNotFoundException.class);
+            assertThatThrownBy(() -> service.transfer("B", "A", 100, "TX-4")).isInstanceOf(AccountNotFoundException.class);
+            assertThat(service.getBalance("B")).as("a failed transfer into a deleted account changes nothing").isEqualTo(500);
+        }
+
+        @Test
+        void deletingAnUnknownOrAlreadyDeletedAccountIsNotFound() {
+            accounts.openAccount("A", 1_000);
+            accounts.deleteAccount("A");
+
+            assertThatThrownBy(() -> accounts.deleteAccount("A")).isInstanceOf(AccountNotFoundException.class);
+            assertThatThrownBy(() -> accounts.deleteAccount("missing")).isInstanceOf(AccountNotFoundException.class);
+        }
+
+        @Test
+        void deletedIdCanNeverBeOpenedAgain() {
+            accounts.openAccount("A", 1_000);
+            accounts.deleteAccount("A");
+
+            assertThatThrownBy(() -> accounts.openAccount("A", 0)).isInstanceOf(DeletedAccountException.class);
+            assertThatThrownBy(() -> service.getBalance("A")).isInstanceOf(AccountNotFoundException.class);
+        }
+
+        @Test
+        void operationRejectedForADeletedAccountDoesNotUseUpItsTransactionId() {
+            accounts.openAccount("A", 1_000);
+            accounts.openAccount("B", 500);
+            accounts.deleteAccount("A");
+            assertThatThrownBy(() -> service.credit("A", 100, "TX-1")).isInstanceOf(AccountNotFoundException.class);
+
+            service.credit("B", 100, "TX-1");
+
+            assertThat(service.getBalance("B")).isEqualTo(600);
+        }
+    }
+
+    @Nested
     class Concurrency {
 
         @Test
@@ -302,6 +351,11 @@ public abstract class BalanceServiceContractTest {
         @Test
         void concurrentDuplicatesAreAppliedOnce() {
             assertAllHold(scenarios().concurrentDuplicatesOfOneTransaction());
+        }
+
+        @Test
+        void transfersRacingADeleteOfTheirDestinationNeverLoseMoney() {
+            assertAllHold(scenarios().transfersRacingADeleteOfTheirDestination());
         }
 
         private ConcurrencyScenarios scenarios() {

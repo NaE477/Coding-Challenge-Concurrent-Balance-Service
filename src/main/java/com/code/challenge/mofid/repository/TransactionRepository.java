@@ -1,6 +1,7 @@
 package com.code.challenge.mofid.repository;
 
 import com.code.challenge.mofid.Profiles;
+import com.code.challenge.mofid.model.TransactionRecord;
 import com.code.challenge.mofid.model.TransactionRequest;
 import com.code.challenge.mofid.model.TransactionType;
 import lombok.RequiredArgsConstructor;
@@ -9,12 +10,15 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Types;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 @Profile(Profiles.POSTGRES)
 @RequiredArgsConstructor
 public class TransactionRepository {
+
+    private static final String AMOUNT = "amount";
 
     private final JdbcClient jdbc;
 
@@ -30,7 +34,7 @@ public class TransactionRepository {
                 .param("type", request.type().name())
                 .param("source", request.sourceAccountId(), Types.VARCHAR)
                 .param("destination", request.destinationAccountId(), Types.VARCHAR)
-                .param("amount", request.amount())
+                .param(AMOUNT, request.amount())
                 .update() == 1;
     }
 
@@ -43,7 +47,21 @@ public class TransactionRepository {
                         TransactionType.valueOf(row.getString("type")),
                         row.getString("source_account_id"),
                         row.getString("destination_account_id"),
-                        row.getLong("amount")))
+                        row.getLong(AMOUNT)))
                 .optional();
+    }
+
+    public List<TransactionRecord> findAll() {
+        return jdbc.sql("""
+                        SELECT transaction_id, type, source_account_id, destination_account_id, amount, created_at
+                        FROM transactions ORDER BY created_at, transaction_id""")
+                .query((row, rowNumber) -> new TransactionRecord(
+                        row.getString("transaction_id"),
+                        TransactionType.valueOf(row.getString("type")),
+                        row.getString("source_account_id"),
+                        row.getString("destination_account_id"),
+                        row.getLong(AMOUNT),
+                        row.getTimestamp("created_at").toInstant()))
+                .list();
     }
 }

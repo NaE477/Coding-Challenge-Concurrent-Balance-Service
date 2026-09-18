@@ -1,6 +1,8 @@
 package com.code.challenge.mofid.service.implementations.jdbc;
 
 import com.code.challenge.mofid.Profiles;
+import com.code.challenge.mofid.exception.AccountNotFoundException;
+import com.code.challenge.mofid.exception.DeletedAccountException;
 import com.code.challenge.mofid.exception.DuplicateAccountException;
 import com.code.challenge.mofid.repository.AccountRepository;
 import com.code.challenge.mofid.service.AccountRegistry;
@@ -22,7 +24,18 @@ public class JdbcAccountRegistry implements AccountRegistry {
     public void openAccount(String accountId, long initialBalance) {
         OperationValidator.validateOpenAccount(accountId, initialBalance);
         if (!accounts.insertIfAbsent(accountId, initialBalance)) {
-            throw new DuplicateAccountException(accountId);
+            throw accounts.isDeleted(accountId)
+                    ? new DeletedAccountException(accountId)
+                    : new DuplicateAccountException(accountId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteAccount(String accountId) {
+        OperationValidator.validateAccountId(accountId);
+        if (!accounts.markDeleted(accountId)) {
+            throw new AccountNotFoundException(accountId);
         }
     }
 }
