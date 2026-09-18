@@ -6,8 +6,6 @@ import com.code.challenge.mofid.exception.SameAccountTransferException;
 
 /**
  * Account balance operations, as specified by the challenge brief.
- *
- * <p>Core of the operation
  */
 public interface BalanceService {
 
