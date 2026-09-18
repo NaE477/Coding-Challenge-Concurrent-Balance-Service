@@ -42,9 +42,4 @@ class InMemoryBackendConfiguration {
     BalanceQueryService inMemoryBalanceQueryService(InMemoryAccountStore accounts) {
         return new InMemoryBalanceQueryService(accounts);
     }
-
-    @Bean
-    ReportService inMemoryReportService(InMemoryAccountStore accounts, InMemoryTransactionLedger ledger) {
-        return new InMemoryReportService(accounts, ledger);
-    }
 }
